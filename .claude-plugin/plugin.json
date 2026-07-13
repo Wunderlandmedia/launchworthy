@@ -1,0 +1,12 @@
+{
+  "name": "launchworthy",
+  "description": "Production readiness audit for apps built with AI coding tools. Detects your stack, audits 5 domains, and produces a scored punch list with copy-paste fixes.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Kemal Esensoy",
+    "email": "ke@wunderlandmedia.com"
+  },
+  "homepage": "https://wunderlandmedia.com",
+  "repository": "https://github.com/wunderlandmedia/launchworthy",
+  "license": "MIT"
+}

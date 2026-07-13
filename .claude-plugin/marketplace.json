@@ -1,0 +1,19 @@
+{
+  "name": "wunderlandmedia",
+  "owner": {
+    "name": "Kemal Esensoy",
+    "email": "ke@wunderlandmedia.com"
+  },
+  "description": "Production-readiness and hardening skills for apps built with AI coding tools.",
+  "plugins": [
+    {
+      "name": "launchworthy",
+      "source": "./",
+      "description": "Audit an AI-built app across 5 domains (Frontend, Backend & Data, Auth & Security, Infrastructure, Operations) and get a scored punch list with copy-paste fixes.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Kemal Esensoy"
+      }
+    }
+  ]
+}

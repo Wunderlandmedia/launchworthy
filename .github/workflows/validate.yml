@@ -1,0 +1,45 @@
+name: validate
+
+# Two guards that keep a broken build from ever reaching the marketplace:
+#   1. links  - every relative link in the skill resolves to a real file
+#               (a dispatch skill silently degrades when a reference link 404s,
+#                and `claude plugin validate` does not follow these links)
+#   2. plugin - the official Claude Code linter over plugin.json, the skill
+#               frontmatter, and the marketplace manifest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: Reference links resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check every skill link
+        run: python3 scripts/check-links.py
+
+  plugin:
+    name: Plugin manifest validates
+    runs-on: ubuntu-latest
+    env:
+      # `latest` keeps CI working without maintenance. Pin to a specific
+      # version (e.g. 2.1.154) if you want bit-for-bit reproducible runs.
+      CLAUDE_CLI_VERSION: latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Claude Code CLI
+        run: npm install -g "@anthropic-ai/claude-code@${CLAUDE_CLI_VERSION}"
+      - name: Validate the plugin (strict)
+        run: claude plugin validate . --strict
+      - name: Validate the marketplace manifest
+        run: claude plugin validate .claude-plugin/marketplace.json

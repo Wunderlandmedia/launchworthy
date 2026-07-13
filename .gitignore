@@ -1,0 +1,22 @@
+# Internal planning docs — never publish these
+wunderlandmedia/
+
+# Audit output (the skill writes reports here in target projects)
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node (in case a test/tooling setup lands here later)
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+.env
+.env.*
