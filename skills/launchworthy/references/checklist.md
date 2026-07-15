@@ -175,9 +175,11 @@ Knowing when it breaks, and surviving when it does.
 
 **Error tracking and logs:**
 - [ ] No error tracking SDK (Sentry, Highlight, LogRocket). You find out it broke when a user leaves = `[HIGH]`. See `fixes/error-tracking.md`.
+- [ ] Installed but inert: the SDK is present but wired so it never fires. A false green here is worse than no tracking, because it buys confidence it has not earned. Flag any of these at `[HIGH]`: DSN is empty, a placeholder, or hardcoded to a dummy value; DSN reads from an env var with no evidence it is set (not in `.env.example`, not referenced in deploy config); `init` is gated behind a prod-only condition (`if (import.meta.env.PROD)`, `NODE_ENV === 'production'`, `enabled: false`) with no confirmation the prod env actually carries the DSN; `sampleRate: 0` or a `beforeSend` that returns `null` unconditionally. See `fixes/error-tracking.md`.
 - [ ] Tracking on client only or server only, not both = `[MEDIUM]`.
 - [ ] No global error handler (`error.tsx`/`global-error.tsx`/framework equivalent) = `[HIGH]`.
 - [ ] Only `console.log`, no structured logging = `[LOW]`. No logging at all = `[MEDIUM]`.
+- [ ] MANUAL CHECK NEEDED (error tracking actually fires). Steps: "Trigger a test error on your live deployment (not localhost) and confirm it appears in your tracker's dashboard within a minute." Evidence: paste the issue title that showed up, or say nothing arrived. Installed but silent counts as no tracking.
 
 **Monitoring and alerting:**
 - [ ] No uptime monitoring = `[MEDIUM]`.
