@@ -44,7 +44,7 @@ What users see when things go right, and especially when they break.
 
 ## Domain 2: Backend & Data
 
-The engine: how data moves, gets stored, and holds up under load. (Connection pooling, background jobs, and external-API resilience live here, not in Infrastructure.)
+The engine: how data moves, gets stored, and holds up under load. (Connection pooling, background jobs, webhooks, and external-API resilience live here, not in Infrastructure.)
 
 **No direct DB or admin access from the browser:**
 - [ ] No client-side code (files with `'use client'`, anything shipped to the browser) imports a DB driver/ORM or calls an API with an admin/service key. Privileged access goes through server components, API routes, server actions, or edge functions. Violation = `[CRITICAL]`.
@@ -61,6 +61,16 @@ The engine: how data moves, gets stored, and holds up under load. (Connection po
 **API hygiene:**
 - [ ] Handlers return meaningful status codes (400/401/403/404/500), not 200 for everything. All-200 = `[MEDIUM]`.
 - [ ] No raw error objects or stack traces returned to clients (leaks internals) = `[HIGH]`. Inconsistent error shapes = `[LOW]`.
+
+**Webhooks (canonical home; payment and provider callbacks):**
+
+The dangerous property of a webhook is that the caller believes your status code. Return 200 and the provider marks the event delivered and never retries; your dashboards stay green while the work never happened.
+
+- [ ] Webhook endpoints verify the provider signature before processing (Stripe `constructEvent` with the signing secret, svix headers, `x-hub-signature-256`). Missing = `[HIGH]`; if the handler grants access, records a payment, or changes entitlements from the event, a forgeable webhook = `[CRITICAL]`, because anyone who finds the URL can mint the event. See `fixes/webhooks.md`.
+- [ ] The handler returns 2xx only after the work succeeded. A catch block that swallows the error and returns 200 anyway is the classic silent revenue failure: the provider sees a successful delivery and moves on, error tracking sees nothing because nothing threw. Swallowed catch returning 2xx = `[HIGH]`. On failure, log to the error tracker and return 5xx so the provider retries. See `fixes/webhooks.md`.
+- [ ] Handlers that fulfill, charge, or grant are idempotent. Providers deliver at least once and retry on timeouts, so the same event can arrive twice. No dedup by event id = `[MEDIUM]`.
+- [ ] Fast-ack rule: events the app deliberately ignores get an immediate 200 with no work, so retries of irrelevant events do not pile up. Heavy fulfillment inside the webhook request risks the provider's timeout; hand off to a background job for slow work (see Background jobs). Advisory unless timeouts are plausible, then `[MEDIUM]`.
+- [ ] MANUAL CHECK NEEDED. Steps: "Open the provider's webhook dashboard (Stripe: Developers > Webhooks > your endpoint) and look at the recent deliveries." Evidence: paste the success/failure counts for the last week and the latest failure's status code, if any. Note: a wall of 200s proves delivery, not that the work happened; the swallowed-catch check above is why this stays code-first.
 
 **Schema, indexes, migrations:**
 - [ ] Schema changes are tracked (Prisma/Drizzle/Supabase migrations, raw SQL, CMS snapshots). Schema that only lives in a dashboard with no migration history = `[HIGH]`; nobody can rebuild it.
