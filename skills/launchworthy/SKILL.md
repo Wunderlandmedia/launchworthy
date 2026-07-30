@@ -125,7 +125,7 @@ Offer to apply the safely automatable fixes. Because this skill runs against a p
 
 When you apply a fix, read the matching playbook in [references/fixes/](references/fixes/) and follow it for the detected stack. Available playbooks:
 
-- `supabase-rls.md`: enable RLS and write ownership policies (the #1 fix)
+- `supabase-rls.md`: enable RLS, write ownership policies (the #1 fix), and close service-role routes that bypass them
 - `firebase-rules.md`: lock down Firestore/RTDB Security Rules
 - `auth-ownership.md`: the server-side "user A cannot read user B" pattern
 - `rate-limiting.md`: protect AI/paid and auth endpoints, per stack

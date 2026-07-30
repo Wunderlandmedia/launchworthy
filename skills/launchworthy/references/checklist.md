@@ -115,6 +115,14 @@ Keeping the wrong people out, and the bills safe from abuse. This is the domain 
 - [ ] The anon key is designed to be public and WILL appear in the frontend. That is fine on its own, and is only safe when RLS is on. Do not flag the anon key as a leak; flag missing RLS as the real problem. Flagging the anon key while RLS is off and calling it handled is wrong.
 - [ ] The `service_role` key must never appear in client-side or public code = `[CRITICAL]`.
 
+**Service-role paths bypass RLS (the RLS false green):**
+
+RLS enabled on every table is not the whole answer. A server route that queries with the `service_role` client bypasses every policy on every table, by design. The wall is still up; that code walks around it. Grep the server side for `service_role`, `SUPABASE_SERVICE_ROLE_KEY`, `createClient(..., serviceKey)`, and any shared admin client (`supabaseAdmin`, `serverClient`) and trace what each one reads or writes.
+
+- [ ] Every server path that uses the service-role client and touches user-owned data does its own ownership check: the user id comes from the verified session (`supabase.auth.getUser()` on the server, or a validated JWT), never from a request body, query param, or header the caller controls. Service-role query filtered by a caller-supplied id with no session check = `[CRITICAL]`. See `fixes/supabase-rls.md`.
+- [ ] Reaching for the service-role client to make a query work is a finding, not a fix. A route using service-role for reads that an ordinary authenticated client could do under RLS = `[HIGH]`; it removes the safety net for no gain. The legitimate uses are narrow: cross-user admin work, background jobs with no user session, webhook handlers.
+- [ ] Score RLS accordingly. Any data path that reaches user data through service-role code without its own ownership check keeps the RLS check off `PASS`, however clean `pg_tables` looks. Report it as the RLS false green, name the file and route, and treat the tables reachable that way as unprotected on that path.
+
 **Firebase Security Rules (if Firebase):**
 - [ ] The Firebase config object (apiKey, projectId, etc.) is public by design and belongs in the frontend. Do not flag it as a secret leak; security comes from Rules, not from hiding the config.
 - [ ] Check `firestore.rules` / database rules. Test/open mode (`allow read, write: if true;` or a global open expiry) = `[CRITICAL]`. No rules file tracked in the repo = `[HIGH]`. See `fixes/firebase-rules.md`.
