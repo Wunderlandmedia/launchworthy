@@ -133,6 +133,7 @@ When you apply a fix, read the matching playbook in [references/fixes/](referenc
 - `input-validation.md`: Zod/Valibot schemas on mutating endpoints
 - `error-tracking.md`: Sentry client + server + global handlers
 - `webhooks.md`: signature verification, honest status codes, and idempotent handlers for payment/provider callbacks
+- `uptime-monitoring.md`: a health endpoint that fails honestly, an external monitor in front of it, and a scheduled synthetic pass through the critical path
 
 **Not automatable (verify in the Step 7 interview, then report with exact steps):** the secret-in-bundle test, the user-A-cannot-read-user-B test, RLS live behavior, turning on RLS / writing Firebase Rules against live data, branch protection, uptime and error-tracking account setup, backup and restore testing, DNS and registrar security, rotating any leaked secret. The interview gathers evidence for these; it does not fix them. Applying the fix (rotating a key, writing a policy against live data) stays the user's call.
 

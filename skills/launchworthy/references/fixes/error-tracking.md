@@ -98,7 +98,7 @@ Confirming the DSN is present is not enough; the only proof is a test error that
 
 ## Add uptime monitoring
 
-Separate from error tracking: a free uptime monitor (UptimeRobot, Better Stack, or the one your host provides) that pings your health check URL every few minutes and pages you when the whole site is down, which error tracking cannot tell you because a dead server reports nothing.
+Separate from error tracking: a free uptime monitor (UptimeRobot, Better Stack, or the one your host provides) that pings your health check URL every few minutes and pages you when the whole site is down, which error tracking cannot tell you because a dead server reports nothing. The monitor has to run from outside your infrastructure, and the URL it pings has to fail when a dependency is down. See [uptime-monitoring.md](uptime-monitoring.md).
 
 ## Verify
 

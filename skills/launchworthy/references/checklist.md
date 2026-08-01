@@ -170,8 +170,10 @@ Shipping it, rolling it back, and serving it fast. (Rollback lives here, not in 
 - [ ] Self-hosted/Docker with no previous image retained = `[HIGH]`. Vercel/Netlify/Cloudflare have instant rollback built in = PASS.
 - [ ] No documented or built-in way to roll back a bad deploy = `[HIGH]`.
 
-**Health check:**
+**Health check (canonical home for the endpoint itself; monitoring of it is Domain 5):**
 - [ ] Self-hosted/Docker with no health check endpoint = `[HIGH]`. No `HEALTHCHECK` in the Dockerfile = `[MEDIUM]`.
+- [ ] Health endpoint that checks nothing = `[MEDIUM]`. A handler whose whole body is `return new Response("ok")`, `res.send("ok")`, `res.json({ status: "ok" })`, or `return { ok: true }` proves only that the process is running and can serve a route. It cannot see a dead database, an expired third-party key, or a queue that stopped draining, so it returns 200 through the outages people actually have. Raise to `[HIGH]` when it is the only signal wired to a monitor, because it is then an active false green. Fix: touch the dependencies the app cannot work without (one cheap DB query, one check per critical external service) and return a non-2xx when one is down. See `fixes/uptime-monitoring.md`.
+- [ ] Health endpoint that returns 200 with a failing body = `[HIGH]`. A handler that catches its own dependency errors and still responds 200 with `{ status: "degraded" }` or `{ db: false }` is invisible to every monitor, because monitors read the status code. The status code has to carry the failure.
 
 **Version control and CI:**
 - [ ] No `.git` directory at all = `[CRITICAL]`; no undo, no history, no recovery.
@@ -201,7 +203,13 @@ Knowing when it breaks, and surviving when it does.
 
 **Monitoring and alerting:**
 - [ ] No uptime monitoring = `[MEDIUM]`.
+- [ ] Monitoring that only runs inside the thing it watches = `[MEDIUM]`. A self-hosted checker in the same `docker-compose.yml`, a cron job on the same box, or a scheduled function in the same project asks the server whether it feels okay. When the host, the region, the DNS record, the TLS certificate, or the deploy itself is what broke, that checker is down too and reports nothing, which reads as silence rather than as an outage. At least one check has to originate outside your infrastructure. See `fixes/uptime-monitoring.md`.
+- [ ] Monitor pointed somewhere that is not production = `[MEDIUM]`. A monitor config in the repo whose target is `localhost`, a preview URL, or a staging host is watching a thing no user visits. Same for a check that hits the health route on the origin while users reach the app through a CDN or proxy, since it skips the layer that usually fails.
+- [ ] MANUAL CHECK NEEDED (the monitor is real and outside-in). Steps: "Open your uptime monitor (UptimeRobot, Better Stack, Cronitor, or your host's). Paste the URL it checks, the interval, and the timestamp of its most recent successful check." Evidence: those three values. A monitor that exists but was paused, or whose last check is weeks old, is inert and scores the same as no monitoring. Reported without artifacts, record as `reported by user, unverified`, never `PASS`.
+- [ ] MANUAL CHECK NEEDED (synthetic pass through the critical path). Steps: "Name the one flow that has to work for this app to be worth running (signup, login, checkout, the core generate/upload action). Then say what routinely exercises it end to end against production, on a schedule, and when it last ran." Evidence: the scheduled synthetic check, the E2E suite that runs against prod, or the honest answer that nothing does. A 200 from the homepage says nothing about whether signup still writes a row or checkout still charges a card. Uptime green while the critical path is broken is the expensive version of this gap, because the dashboard is the reason nobody looked. See `fixes/uptime-monitoring.md`.
 - [ ] MANUAL CHECK NEEDED. Steps: "Confirm error/uptime alerts actually reach you (email, Slack, SMS)." Evidence: a screenshot of a test alert. Tracking with no alerting is a dashboard nobody looks at.
+
+**Scoring rule for monitoring:** uptime monitoring cannot be scored `PASS` while the only evidence is a health endpoint that returns a static 200, a checker that lives inside the deployment it watches, or a monitor the user says exists but cannot show a recent check for. Presence of a monitoring account is not coverage; a check that runs from outside and fails when the app is broken is.
 
 **Backups and recovery:**
 - [ ] No automated database backups = `[HIGH]`. (Supabase/PlanetScale/Neon have them; confirm they are on and check retention. Self-hosted DB with no backup job = `[HIGH]`.)
