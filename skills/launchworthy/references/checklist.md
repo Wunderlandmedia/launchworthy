@@ -92,9 +92,22 @@ The dangerous property of a webhook is that the caller believes your status code
 - [ ] AI calls have error handling; they fail and time out often. None = `[HIGH]`. No loading feedback = `[MEDIUM]`.
 - [ ] No handling of HTTP 429 (rate limited) from external APIs you depend on = `[MEDIUM]`.
 
-**App-level caching:**
+**App-level caching (canonical home for cache correctness):**
 - [ ] Identical DB/API/CMS queries repeated with no caching or revalidation = `[MEDIUM]`.
 - [ ] Identical AI calls repeated with no caching = `[MEDIUM]`; it is also expensive.
+
+**Cached authority data (the inverse failure: cached too long, not too little):**
+
+Missing caching is slow. Caching the wrong thing is wrong, and it is quieter. Authority data is anything the app uses to decide what a user may do or pay: roles and permissions, subscription or entitlement status, account status (active, suspended, deleted), pricing and plan limits, inventory or remaining quota. When that data is served from a TTL cache with no event-driven invalidation, a revoked user keeps access until the TTL expires, and nothing throws. No 500, no Sentry event, no failed request: the app is confidently serving a stale answer, so monitoring cannot see it and the only signal is a customer or an auditor.
+
+Look for authority data behind: `unstable_cache` / `"use cache"` / `cacheLife`, `fetch(..., { next: { revalidate: N } })` or `cache: "force-cache"`, route segment `export const revalidate = N`, ISR on a page that renders plan or permission state, React Query `staleTime` / `gcTime` on a session or entitlement query, a Redis/KV/Upstash `set` with `EX`/`ttl`, an in-memory `Map` populated at module scope, and `localStorage` / `sessionStorage` holding a role, plan, or feature-flag set.
+
+- [ ] Permissions, roles, entitlements, subscription status, or account status served from a cache whose only expiry is a TTL = `[HIGH]`. The window between the revocation and the TTL is a window of unpaid or unauthorized access, and it repeats for every cached principal. Fix: invalidate on the event that changes the fact (the webhook, the admin action, the mutation), and keep the TTL only as a backstop. See `fixes/cache-invalidation.md`.
+- [ ] Prices, plan limits, or inventory counts read from a cache with no invalidation on write = `[HIGH]` when the cached value is used to charge, gate, or promise. Selling at last week's price or accepting an order for stock that is gone is a money bug, not a staleness annoyance. Displaying a stale count next to a fresh authoritative check at commit time = `[LOW]`.
+- [ ] The mutation path that changes authority data also clears or rewrites every cache that holds it. A Stripe webhook that updates the subscription row but never calls `revalidateTag`, `revalidatePath`, `redis.del`, or `queryClient.invalidateQueries` = `[HIGH]`; the payment succeeded and the app still behaves as if it did not. Cache keyed per user but invalidated globally, or the reverse (one global key holding per-user authority data) = `[HIGH]`, because the invalidation misses.
+- [ ] Authority data cached in the browser (`localStorage`, `sessionStorage`, a persisted client store) and trusted by the client to unlock UI, with no server-side re-check on the action = `[HIGH]`. This is a stale-cache bug and an authorization bug at once; the server check is the one that matters (see Domain 3).
+- [ ] Revocation has a stated bound. Whatever the design, the answer to "a user is deactivated right now, how long until they are actually locked out" must be a number the code justifies, not an unknown. No invalidation and no bound = `[HIGH]`; long-lived sessions or JWTs carrying claims that are never re-checked server-side belong here too. See `fixes/cache-invalidation.md`.
+- [ ] Score it honestly. Caching cannot be `PASS` while any authority path is TTL-only. Report it as the staleness false green: name the cache, the field, and the revocation window in real units ("a suspended account keeps admin access for up to 60 minutes"), because that number is what makes the finding land.
 
 ---
 
