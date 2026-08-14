@@ -133,6 +133,7 @@ When you apply a fix, read the matching playbook in [references/fixes/](referenc
 - `input-validation.md`: Zod/Valibot schemas on mutating endpoints
 - `error-tracking.md`: Sentry client + server + global handlers
 - `webhooks.md`: signature verification, honest status codes, and idempotent handlers for payment/provider callbacks
+- `payments-lifecycle.md`: failed-renewal dunning, a refund and cancellation path at checkout, and dispute-evidence readiness for apps that take money
 - `cache-invalidation.md`: event-driven purging for permissions, entitlements, pricing, and inventory, so a revoked user is actually locked out
 - `uptime-monitoring.md`: a health endpoint that fails honestly, an external monitor in front of it, and a scheduled synthetic pass through the critical path
 
