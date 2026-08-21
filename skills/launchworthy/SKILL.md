@@ -135,6 +135,7 @@ When you apply a fix, read the matching playbook in [references/fixes/](referenc
 - `webhooks.md`: signature verification, honest status codes, and idempotent handlers for payment/provider callbacks
 - `payments-lifecycle.md`: failed-renewal dunning, a refund and cancellation path at checkout, and dispute-evidence readiness for apps that take money
 - `cache-invalidation.md`: event-driven purging for permissions, entitlements, pricing, and inventory, so a revoked user is actually locked out
+- `account-deletion.md`: a self-serve deletion path that cascades to owned rows, cancels billing, cleans up third parties, and a privacy policy that matches the data actually collected
 - `uptime-monitoring.md`: a health endpoint that fails honestly, an external monitor in front of it, and a scheduled synthetic pass through the critical path
 
 **Not automatable (verify in the Step 7 interview, then report with exact steps):** the secret-in-bundle test, the user-A-cannot-read-user-B test, RLS live behavior, turning on RLS / writing Firebase Rules against live data, branch protection, uptime and error-tracking account setup, backup and restore testing, DNS and registrar security, rotating any leaked secret. The interview gathers evidence for these; it does not fix them. Applying the fix (rotating a key, writing a policy against live data) stays the user's call.
