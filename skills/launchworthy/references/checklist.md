@@ -184,6 +184,25 @@ RLS enabled on every table is not the whole answer. A server route that queries 
 - [ ] `.env*` missing from `.gitignore` = `[CRITICAL]`. `.env` ever committed = `[HIGH]`, and the secrets must be rotated, not just deleted.
 - [ ] Hardcoded `http://` URLs in production config = `[MEDIUM]`.
 
+**Secrets in git history (canonical home for the history scan):**
+- [ ] The working tree is not the whole repo. A key pasted into `lib/stripe.ts`, committed, then moved to an env var in the next commit is gone from every grep of the current files and still sitting in the history, readable by anyone who can clone. `.gitignore` was added after the fact, the file was deleted, the commit was amended: none of that removes the blob. Scan history, not just the checkout.
+- [ ] Scan with a real scanner when one is available, since it catches formats a hand-written grep will not:
+  ```bash
+  gitleaks detect --source . --redact          # scans full history by default
+  trufflehog git file://. --results=verified   # verified means the key still works
+  ```
+- [ ] No scanner installed? Do not skip the check, run the targeted version. Search every reachable commit for the high-signal prefixes:
+  ```bash
+  git grep -nEI "sk_live_|sk-[A-Za-z0-9]{20}|rk_live_|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20}|github_pat_|AIza[0-9A-Za-z_-]{20}|xox[baprs]-|service_role|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|postgres(ql)?://[^:]+:[^@]+@" $(git rev-list --all) 2>/dev/null | head -50
+  git log --all --diff-filter=D --name-only -- '*.env' '*.env.*' '*.pem' '*.p12' '*-key.json' | head -50
+  ```
+  On a long history, bound it (`$(git rev-list --all -n 500)`) and say in the report that the scan was bounded, so a clean result is not read as a full-history clean bill.
+- [ ] Any live credential reachable in history = `[HIGH]`, raised to `[CRITICAL]` when the remote is public (`git remote -v`, then check the repo's visibility) or when the repo was ever public, or when the credential is a service-role key, cloud provider key, or database URL with a password. A public repo means assume harvested: bots scan new commits within minutes, and the clock started at the commit date, not at discovery.
+- [ ] The second command above catches the deleted-file case: an `.env`, `.pem`, or service-account JSON that exists in no current directory but is intact in the commit that removed it.
+- [ ] MANUAL CHECK NEEDED (is the found credential still valid). Steps: "For each key the scan found, open the provider dashboard and check whether that key still exists and when it was last used. Tell me the key's name and its created/last-used dates, never the value." A key that was rotated after the leaking commit is a closed finding; one that is still active is open regardless of how old the commit is.
+- [ ] The remedy is rotation, not history rewriting. Report it that way. `git filter-repo` or BFG changes what a fresh clone sees; it does not reach the clones, forks, CI caches, and provider-side cached views that already have the blob. Rewriting first and rotating later, or never, is the common and wrong order. See `fixes/git-history-secrets.md`.
+- [ ] Scoring rule for git hygiene: it cannot be scored `PASS` while a credential is reachable in history and has not been rotated, however clean the current tree is. A clean working tree with an unrotated key three commits back is a false green, and it is the exact shape this audit exists to catch.
+
 **Security headers:**
 - [ ] Where headers are set depends on the stack: Next.js `headers()` in config; SvelteKit `handle` hook plus the built-in `kit.csp` in `svelte.config.js`; TanStack Start server middleware or host config; Astro/Netlify/Cloudflare `public/_headers`; Vite SPA at the host/CDN. Missing CSP = `[HIGH]`, HSTS = `[HIGH]`, X-Frame-Options = `[MEDIUM]`, X-Content-Type-Options = `[MEDIUM]`. See `fixes/security-headers.md`.
 
