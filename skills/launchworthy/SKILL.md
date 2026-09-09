@@ -131,6 +131,7 @@ When you apply a fix, read the matching playbook in [references/fixes/](referenc
 - `rate-limiting.md`: protect AI/paid and auth endpoints, per stack
 - `security-headers.md`: CSP, HSTS, and friends, per framework
 - `input-validation.md`: Zod/Valibot schemas on mutating endpoints
+- `api-over-exposure.md`: explicit field lists, one public shape per resource, and a Supabase view so responses stop shipping whole rows
 - `error-tracking.md`: Sentry client + server + global handlers
 - `git-history-secrets.md`: scanning the full history for credentials, rotating them in the right order, and keeping the next one out of the repo
 - `webhooks.md`: signature verification, honest status codes, and idempotent handlers for payment/provider callbacks

@@ -62,6 +62,27 @@ The engine: how data moves, gets stored, and holds up under load. (Connection po
 - [ ] Handlers return meaningful status codes (400/401/403/404/500), not 200 for everything. All-200 = `[MEDIUM]`.
 - [ ] No raw error objects or stack traces returned to clients (leaks internals) = `[HIGH]`. Inconsistent error shapes = `[LOW]`.
 
+**Response over-exposure (canonical home for what a response body contains):**
+
+The ownership check in Domain 3 asks whether this caller may see this row. This asks what is inside the row once they may. AI tools reach for `select('*')` and `return user` because it works on the screen, and the screen is the wrong place to look: the fields nobody renders are still in the response body, in the network tab, and in the page source. That is where the email addresses, the password hashes, the reset tokens, the internal flags, and the other user's Stripe id are sitting. Nothing errors, nothing looks wrong, and the endpoint is paginated, so collecting it is a loop and not an exploit.
+
+Find the shape of every response that leaves the server:
+
+```bash
+grep -rn "select('\*')\|select(\"\*\")\|SELECT \*" app/ src/ lib/ server/
+grep -rn "findMany(\|findFirst(\|findUnique(\|\.query\." app/ src/ lib/ | grep -v "select:\|columns:"
+grep -rn "res.json(\|NextResponse.json(\|Response.json(\|return { props:" app/ src/ pages/
+```
+
+- [ ] Responses are shaped from an explicit field list, not from whatever the query happened to return. A handler that hands the client a whole database row (`select('*')`, a Prisma `findMany` with no `select`, a Drizzle query with no `columns`, `res.json(row)`) = `[MEDIUM]` on its own, and the severities below when the table holds any of what follows. The fix is a field list at the boundary, not a `delete row.password` on the way out. See `fixes/api-over-exposure.md`.
+- [ ] No credential or auth material reaches a client, ever. `password`, `password_hash`, `salt`, `reset_token`, `verification_token`, `two_factor_secret`, `recovery_codes`, `api_key`, `refresh_token`, `session_token`, or a stored third-party `access_token` in a response body = `[CRITICAL]`, whether or not the UI renders it. A hash is cracked offline at leisure and a reset token is an account takeover in a single request, so this is not a privacy finding, it is a break-in.
+- [ ] Other users' personal data does not ride along in list, search, feed, comment, leaderboard, or public-profile responses. A join that pulls the full author or owner row (email, phone, address, date of birth, last known IP) into something any logged-in user can request = `[HIGH]`. One paginated endpoint like this is the whole user table's email list, which is why it is the shape that ends up in breach write-ups.
+- [ ] Internal and privileged columns stay on the server. `is_admin`, `role`, `banned`, `credits`, `balance`, `internal_notes`, `moderation_status`, `flagged_by`, `cost`, `margin`, unreleased feature flags, another user's `stripe_customer_id` = `[MEDIUM]`, raised to `[HIGH]` where the field is another user's commercial data or where the client uses it to unlock UI (the missing server-side check is then a Domain 3 finding of its own).
+- [ ] Server-rendered frameworks leak the same rows without any API to look at. A Next.js server component that passes a full row as a prop to a client component serializes every column into the RSC payload; `getServerSideProps` returning a whole record embeds it in `__NEXT_DATA__`; a SvelteKit `load` or a TanStack Start loader returning a full row ships it in the page data. Not rendering a field does not remove it, view source does. A full row crossing the server-to-client boundary scores the same as returning it from an endpoint.
+- [ ] Supabase: row-level security does not do columns. A policy decides which rows come back; `select('*')` from the browser then returns every column of those rows, including the ones added to the table months later by someone who never thought about this query. Where a table mixes public and private columns, expose the public ones through a view (or column-level grants) and select explicit fields from the client. Client-side `select('*')` against a table holding secrets, PII, or privileged flags = `[HIGH]`. See `fixes/api-over-exposure.md`.
+- [ ] MANUAL CHECK NEEDED. Steps: "Open the app, DevTools > Network, load the main list or feed page and your own profile page. Expand the biggest JSON response and read the field names." Evidence: paste the list of field names, never the values. The check is what is present, not what is displayed.
+- [ ] Score it by what a stranger can collect, not by what the page shows. Response shape cannot be `PASS` while any response carries auth material or another user's personal data. Report it concretely: the route, the columns that should not be there, and what a paginated loop over that endpoint yields ("`/api/posts` returns every author's email; 40 per page, no cap").
+
 **Webhooks (canonical home; payment and provider callbacks):**
 
 The dangerous property of a webhook is that the caller believes your status code. Return 200 and the provider marks the event delivered and never retries; your dashboards stay green while the work never happened.
