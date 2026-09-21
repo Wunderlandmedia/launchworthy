@@ -186,6 +186,7 @@ When you apply a fix, read the matching playbook in [references/fixes/](referenc
 - `cache-invalidation.md`: event-driven purging for permissions, entitlements, pricing, and inventory, so a revoked user is actually locked out
 - `account-deletion.md`: a self-serve deletion path that cascades to owned rows, cancels billing, cleans up third parties, and a privacy policy that matches the data actually collected
 - `uptime-monitoring.md`: a health endpoint that fails honestly, an external monitor in front of it, and a scheduled synthetic pass through the critical path
+- `platform-limits.md`: direct-to-storage uploads that skip the function's body cap, long work moved to a job instead of a larger timeout, and a record written before the expensive call survives the kill
 
 **Not automatable (verify in the Step 7 interview, then report with exact steps):** the secret-in-bundle test, the user-A-cannot-read-user-B test, RLS live behavior, turning on RLS / writing Firebase Rules against live data, branch protection, uptime and error-tracking account setup, backup and restore testing, DNS and registrar security, rotating any leaked secret. The interview gathers evidence for these; it does not fix them. Applying the fix (rotating a key, writing a policy against live data) stays the user's call.
 

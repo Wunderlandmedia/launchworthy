@@ -116,7 +116,22 @@ Detecting `stripe` / `@stripe/stripe-js`, `braintree`, `@paddle/paddle-js`, `@le
 
 **Background jobs and heavy work (canonical home):**
 - [ ] Heavy work (email, image/video processing, long AI calls) done inline in the request with no queue = `[HIGH]` at scale.
-- [ ] Operations that can exceed platform limits (Vercel 10s hobby / 60s pro, Netlify 10s, Workers CPU limits) with no awareness = `[MEDIUM]`.
+- [ ] Operations that can exceed platform limits (Vercel 10s hobby / 60s pro, Netlify 10s, Workers CPU limits) with no awareness = `[MEDIUM]`. The specific mismatches, and how they fail, are in Platform limits below.
+
+**Platform limits the code does not know about (canonical home for host ceilings):**
+
+There are two limits on every request and only one of them is in the repo. The app has its own: a validated max file size, an `export const maxDuration`, a retry count. The host has another: a request-body cap, a function timeout on this plan. When the app's number is the larger one, the host wins, and it wins from outside the handler. The request is killed before or around your code, so no `catch` runs, no `finally` runs, and nothing reaches error tracking. The user gets a blank failure and the team gets silence.
+
+This never shows up in development, which is the whole reason it ships. `next dev`, `netlify dev`, and `wrangler dev` enforce none of these caps. A 40 MB upload and a 90 second generation both work perfectly on the machine where the feature was built.
+
+The numbers below are anchors, not gospel; plans change and they differ per host, so read the current limit for the plan this project is actually on and compare it to what the code permits.
+
+- [ ] Upload path accepts files larger than the host's request-body cap = `[MEDIUM]`, raised to `[HIGH]` when uploading is a core flow (the product is a photo app, a document tool, a resume parser). Typical caps: Vercel serverless and edge functions about 4.5 MB and not configurable, Netlify Functions about 6 MB of base64 payload, AWS Lambda behind API Gateway about 6 to 10 MB, Cloudflare Workers about 100 MB on the free plan and higher on paid. Grep for the file crossing the function: `formData()`, `multipart/form-data`, `multer`, `busboy`, `formidable`, `req.file`, `<input type="file">`, a `supabase.storage.from(...).upload(` on a server route, an `@vercel/blob` `put(` on the server. The fix is not a bigger cap, it is not sending the bytes through the function at all. See `fixes/platform-limits.md`.
+- [ ] The limit the app advertises contradicts the limit the platform enforces = `[MEDIUM]`. A dropzone labeled "up to 50MB", a Zod schema with `.max(20 * 1024 * 1024)`, or a `bodyParser: { sizeLimit: '25mb' }` on a host that stops the request at 4.5 MB is a promise the deployment cannot keep. Both numbers are readable, so the mismatch is a code finding, not a hunch.
+- [ ] A route declares more runtime than its plan allows = `[MEDIUM]`. `export const maxDuration = 300` does not buy 300 seconds on a plan whose ceiling is lower; the plan clamps it and the declaration reads as coverage. Check every `maxDuration`, `vercel.json` `functions.maxDuration`, `netlify.toml` timeout, and `wrangler.toml` limits against the plan in use.
+- [ ] A slow route has a paid call or a mutation sitting after the slow step = `[HIGH]`. This is the expensive shape of the timeout. The AI provider, the PDF renderer, or the video encoder was already invoked and already billed; the function is killed before the line that writes the result, decrements the credit, or marks the job done. The customer paid, the app has no record, and because a kill is not an exception there is no event anywhere to reconcile against. Streaming hides it further: the 200 and the first tokens already went out, so the client sees a truncated success rather than an error. See `fixes/platform-limits.md`.
+- [ ] MANUAL CHECK NEEDED (which plan, and the largest real input). Steps: "In your host's dashboard, name the plan this project is on and open the function settings; paste the request-size and duration limits it shows. Then tell me the largest file a real user would upload and the slowest generation this app performs." Evidence: the plan name plus the two limits, and a realistic input size. Every ceiling in this cluster depends on the plan, so an unknown plan leaves these checks provisional rather than passing.
+- [ ] **Scoring rule:** platform limits cannot be scored `PASS` because nothing has broken yet. Local development enforces none of them, so "it works" is evidence about a laptop. Report the comparison in both numbers and name the route: "`app/api/upload/route.ts` accepts up to 25 MB, the deploy target stops the request at 4.5 MB." Where the plan is unknown, say so and mark it provisional.
 
 **External and AI API resilience (canonical home for 429 handling):**
 - [ ] AI calls have error handling; they fail and time out often. None = `[HIGH]`. No loading feedback = `[MEDIUM]`.
@@ -266,6 +281,7 @@ Shipping it, rolling it back, and serving it fast. (Rollback lives here, not in 
 **Survives load:**
 - [ ] A database connection limit that real traffic will exceed = `[HIGH]` (fix via pooling, see Domain 2).
 - [ ] Expecting 10+ concurrent users on serverless + direct DB with no pooling = `[HIGH]`.
+- [ ] The plan's own ceilings (request body size, function duration) are a Domain 2 finding, scored under Platform limits there. Note the plan here, because that is what decides the numbers, and audit the mismatch against the code in Domain 2.
 
 ---
 
