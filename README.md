@@ -35,10 +35,10 @@ Most "production checklist" content tells you *that* you have a gap and stops th
 | # | Domain | What it catches |
 |---|---|---|
 | 1 | Frontend & Experience | White screens, missing loading/empty states, broken responsive, a11y gaps |
-| 2 | Backend & Data | DB or admin keys reachable from the browser, no input validation, no connection pooling, N+1 queries, unguarded AI calls |
-| 3 | Auth & Security | Supabase RLS off, open Firebase rules, "user A can read user B," secrets in the bundle, no rate limit on your paid AI endpoint |
-| 4 | Infrastructure & Deployment | One environment, no rollback, no health check, no CI, no CDN |
-| 5 | Operations & Recovery | No error tracking, no backups, untested restores, can you rebuild in under an hour |
+| 2 | Backend & Data | DB or admin keys reachable from the browser, responses that ship whole rows, webhooks that fail silently, failed renewals nobody sees, stale permission caches, uploads and timeouts the host kills, account deletion that keeps the data, no connection pooling, unguarded AI calls |
+| 3 | Auth & Security | Supabase RLS off or bypassed by service-role routes, open Firebase rules, "user A can read user B," secrets in the bundle or in git history, no rate limit on your paid AI endpoint |
+| 4 | Infrastructure & Deployment | One environment, no rollback, a health check that checks nothing, no CI, no CDN |
+| 5 | Operations & Recovery | No error tracking or tracking that never fires, no outside-in uptime check, no backups, untested restores, can you rebuild in under an hour |
 
 Full check list: [`skills/launchworthy/references/checklist.md`](skills/launchworthy/references/checklist.md).
 
@@ -85,6 +85,10 @@ If you built in Cursor or Claude Code, your code is already on your machine. Jus
 
 That is a one-time setup. The plugin is now available in every project you ever open.
 
+Then turn on auto-update, so new checks reach you as they ship: type `/plugin`, open **Marketplaces**, select **wunderlandmedia**, and choose **Enable auto-update**. Claude Code leaves it off by default for third-party marketplaces like this one.
+
+Already installed? Run `/plugin marketplace update wunderlandmedia` once to pick up everything added since you installed, then turn on auto-update as above.
+
 **4. Ask for the audit.** Just say what you want in plain English:
 
 > Is my app production ready?
@@ -125,10 +129,18 @@ launchworthy/                         # a Claude Code plugin + marketplace
 │               ├── supabase-rls.md
 │               ├── firebase-rules.md
 │               ├── auth-ownership.md
+│               ├── api-over-exposure.md
+│               ├── input-validation.md
 │               ├── rate-limiting.md
 │               ├── security-headers.md
-│               ├── input-validation.md
-│               └── error-tracking.md
+│               ├── git-history-secrets.md
+│               ├── webhooks.md
+│               ├── payments-lifecycle.md
+│               ├── cache-invalidation.md
+│               ├── account-deletion.md
+│               ├── platform-limits.md
+│               ├── error-tracking.md
+│               └── uptime-monitoring.md
 ├── examples/sample-report.md
 ├── scripts/check-links.py             # CI: every skill reference link resolves
 ├── .github/workflows/validate.yml     # CI: link check + `claude plugin validate`
