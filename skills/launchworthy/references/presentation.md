@@ -59,7 +59,7 @@ Under the scorecard, list findings worst first, outside the diff fence (severity
 [MEDIUM]    White screen when the API returns 500        app/error.tsx
 ```
 
-Note: `service_role` in the bundle is the real critical, not the anon key. The anon key in the frontend is by design and must never be listed as a finding (see checklist.md, Domain 3). Getting this pair right is the skill's whole credibility; a report that flags the anon key reads as amateur.
+Note: `service_role` (or a secret key, `sb_secret_...`) in the bundle is the real critical, not the anon key (or publishable key). The public key in the frontend is by design and must never be listed as a finding (see checklist.md, Domain 3). Getting this pair right is the skill's whole credibility; a report that flags the anon key reads as amateur.
 
 ## Fix Now, with exact files
 

@@ -8,6 +8,7 @@ The single most common critical bug in vibe-coded apps. If RLS is off on a table
 - RLS is the wall behind that key. With RLS **on** and policies written, the anon key can only do what your policies allow. With RLS **off**, the anon key can do anything.
 - So the fix is never "hide the anon key." The fix is "turn on RLS and write policies."
 - The **service_role key** bypasses RLS entirely. It must live only on a server, never in the browser. If it is in client code, rotate it immediately.
+- Newer projects use a **publishable key** (`sb_publishable_...`) in place of the anon key and a **secret key** (`sb_secret_...`) in place of `service_role`; Supabase deprecates the legacy pair by the end of 2026. Same rules: the publishable key is public, the secret key is server-only.
 
 ## Do this carefully on a live database
 
@@ -90,7 +91,7 @@ RLS on every table is necessary, not sufficient. The `service_role` client bypas
 Find the service-role paths:
 
 ```bash
-grep -rn "SUPABASE_SERVICE_ROLE\|service_role\|supabaseAdmin\|createServiceClient" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.sql" .
+grep -rn "SUPABASE_SERVICE_ROLE\|service_role\|SUPABASE_SECRET\|sb_secret_\|supabaseAdmin\|createServiceClient" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.sql" .
 ```
 
 For each hit, ask what user data it reads or writes and where the user id comes from.
@@ -142,7 +143,7 @@ Rules of thumb:
 
 - In the SQL editor: `select tablename, rowsecurity from pg_tables where schemaname = 'public';` and confirm every user-data table is now `true`.
 - MANUAL: log in as User A, then try to fetch a row owned by User B through the client. You should get nothing back. Paste the result into the audit as evidence.
-- Confirm `service_role` appears nowhere in client code: search the repo for `service_role` and `SUPABASE_SERVICE_ROLE`. It belongs only in server-side env, never behind a `VITE_`/`NEXT_PUBLIC_` prefix.
+- Confirm `service_role` appears nowhere in client code: search the repo for `service_role`, `SUPABASE_SERVICE_ROLE`, `sb_secret_`, and `SUPABASE_SECRET`. It belongs only in server-side env, never behind a `VITE_`/`NEXT_PUBLIC_` prefix.
 
 ## What not to do
 

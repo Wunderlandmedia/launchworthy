@@ -44,7 +44,7 @@ The step people skip is 3. A rotated-but-not-revoked key is exactly as leaked as
 Per provider, the thing to actually revoke:
 
 - **Stripe:** roll the restricted or secret key (Developers > API keys > Roll). Rolling supports a grace window; set it short.
-- **Supabase:** the `service_role` key is a signed JWT, so it cannot be revoked individually. You must rotate the project's JWT secret, which invalidates the anon key and every existing user session too. Plan for the forced logout; do it anyway.
+- **Supabase:** a secret key (`sb_secret_...`) is revoked on its own: create a new one, deploy it, then delete the leaked one in the dashboard. Give each backend component its own secret key so one leak rotates one key. A legacy `service_role` key is a signed JWT and cannot be revoked individually; replace it with a new secret key, and if the project must stay on the legacy keys, rotate the JWT secret, which invalidates the anon key and every user session too. Plan for the forced logout; do it anyway.
 - **AWS:** create a new access key, deploy, then delete the old one. Check CloudTrail for use of the old key before and after.
 - **Database URL with a password:** change the password on the role, do not just move the URL to an env var. The password is the credential.
 - **OAuth client secrets, SMTP passwords, webhook signing secrets:** each has its own rotate path; none of them rotate by editing your repo.
