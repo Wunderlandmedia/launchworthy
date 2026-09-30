@@ -210,7 +210,7 @@ RLS enabled on every table is not the whole answer. A server route that queries 
 **Secret exposure:**
 - [ ] Any admin token, service key, database URL, or third-party secret behind a public env prefix (`NEXT_PUBLIC_`, `VITE_`, `PUBLIC_`, `EXPO_PUBLIC_`, `REACT_APP_`) = `[CRITICAL]`. SvelteKit note: anything under `PUBLIC_` (read via `$env/static/public`) ships to the browser; secrets must use a non-public name via `$env/static/private`. Exceptions: Supabase anon key and Firebase config are meant to be public.
 - [ ] Hardcoded secrets in client code = `[CRITICAL]`.
-- [ ] MANUAL CHECK NEEDED (secret-in-bundle test). Steps: "Build the app, open it in a browser, DevTools > Sources, search bundled JS for: key, secret, token, password, apikey, service_role." Evidence: screenshot or paste hits. A real backend secret in the frontend is critical. (Supabase anon key and Firebase config are expected.)
+- [ ] MANUAL CHECK NEEDED (secret-in-bundle test). Searching the bundle for `service_role` finds nothing even when the key is there: the build replaces `import.meta.env.X` or `process.env.NEXT_PUBLIC_X` with the value, so the variable name never reaches the bundle, and a Supabase key is a JWT (`eyJ...`) whose role sits base64-encoded inside it. Decode instead of searching: run the deployed-bundle probe in `evidence-interview.md` against the production URL. It reads the role inside every JWT the page's scripts carry and flags secret-key prefixes (`sb_secret_`, `sk_live_`, `rk_live_`, `sk-proj-`, `sk-ant-`, `AKIA`, private keys), printing names, never values. Evidence: its output. `role=service_role` or any secret prefix = `[CRITICAL]`. Test the deployed site, not a local build: a local build inlines your local `.env` files, not the variables set on the host, so it can show a leak but cannot rule one out. (Supabase anon key and Firebase config are expected.)
 
 **Cookie configuration:**
 - [ ] Auth cookies: `httpOnly` true (missing = `[HIGH]`), `secure` true in production (missing = `[HIGH]`), `sameSite` lax/strict (missing = `[MEDIUM]`).
@@ -229,7 +229,7 @@ RLS enabled on every table is not the whole answer. A server route that queries 
   ```
 - [ ] No scanner installed? Do not skip the check, run the targeted version. Search every reachable commit for the high-signal prefixes:
   ```bash
-  git grep -nEI "sk_live_|sk-[A-Za-z0-9]{20}|rk_live_|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20}|github_pat_|AIza[0-9A-Za-z_-]{20}|xox[baprs]-|service_role|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|postgres(ql)?://[^:]+:[^@]+@" $(git rev-list --all) 2>/dev/null | head -50
+  git grep -nEI "sk_live_|sk-[A-Za-z0-9_-]{20,}|rk_live_|sb_secret_|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20}|github_pat_|AIza[0-9A-Za-z_-]{20}|xox[baprs]-|service_role|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|postgres(ql)?://[^:]+:[^@]+@" $(git rev-list --all) 2>/dev/null | head -50
   git log --all --diff-filter=D --name-only -- '*.env' '*.env.*' '*.pem' '*.p12' '*-key.json' | head -50
   ```
   On a long history, bound it (`$(git rev-list --all -n 500)`) and say in the report that the scan was bounded, so a clean result is not read as a full-history clean bill.

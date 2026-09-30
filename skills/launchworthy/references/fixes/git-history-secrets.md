@@ -16,7 +16,7 @@ trufflehog git file://. --results=verified     # "verified" means it called the 
 No scanner and no appetite to install one? The targeted version catches the common prefixes:
 
 ```bash
-git grep -nEI "sk_live_|sk-[A-Za-z0-9]{20}|rk_live_|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20}|github_pat_|AIza[0-9A-Za-z_-]{20}|xox[baprs]-|service_role|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|postgres(ql)?://[^:]+:[^@]+@" $(git rev-list --all) 2>/dev/null
+git grep -nEI "sk_live_|sk-[A-Za-z0-9_-]{20,}|rk_live_|sb_secret_|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20}|github_pat_|AIza[0-9A-Za-z_-]{20}|xox[baprs]-|service_role|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|postgres(ql)?://[^:]+:[^@]+@" $(git rev-list --all) 2>/dev/null
 
 # files that no longer exist but are intact in the commit that deleted them
 git log --all --diff-filter=D --name-only -- '*.env' '*.env.*' '*.pem' '*.p12' '*-key.json'
@@ -27,7 +27,7 @@ git log -p --all --follow -- path/to/config.ts
 
 `git rev-list --all` covers every branch and tag, which is the point: the leak is often on a dead feature branch nobody remembers. On a very long history, bound it with `-n 500` and note that the scan was bounded.
 
-Two things the grep will miss and the scanner catches: base64 or JWT-shaped values with no recognizable prefix (a Supabase `service_role` JWT looks like any other `eyJ...`), and credentials inside a committed lockfile, notebook output, or build artifact.
+Two things the grep will miss and the scanner catches: base64 or JWT-shaped values with no recognizable prefix (a Supabase `service_role` JWT looks like any other `eyJ...`), and credentials inside a committed lockfile, notebook output, or build artifact. To check a JWT by hand, decode its middle segment and read the `role` claim; the deployed-bundle probe in `evidence-interview.md` shows how.
 
 ## Step 2: Rotate every key you found
 
