@@ -102,25 +102,35 @@ export function toPrivateUser(user: User) {
 
 Two shapes, chosen by who is asking: `toPrivateUser` only for the row belonging to the verified session, `toPublicUser` for everyone else. A single "user" shape that includes the email is how another user's address ends up in a comment thread.
 
-## Step 4: Supabase, use a view for the public columns
+## Step 4: Supabase, keep private columns out of the browser's reach
 
 Row-level security decides which rows come back. It says nothing about columns, so a browser holding the anon key can `select('*')` on any row a policy allows and read every column of it, including whatever gets added later.
 
+Close it with column privileges: take table-wide read away from the browser roles, give them read on the public columns only, and put a view over those columns so the client still has something it can `select('*')` from.
+
 ```sql
--- public projection of profiles
-create view public.public_profiles as
+-- the browser roles may read only the public columns of profiles
+revoke select on public.profiles from anon, authenticated;
+grant select (id, display_name, avatar_url, created_at) on public.profiles to anon, authenticated;
+
+-- a view over exactly those columns; security_invoker keeps the table's RLS in force
+create view public.public_profiles with (security_invoker = on) as
   select id, display_name, avatar_url, created_at
   from public.profiles;
 
-alter view public.public_profiles set (security_invoker = on);
-
-revoke all on public.profiles from anon, authenticated;
 grant select on public.public_profiles to anon, authenticated;
 ```
 
-`security_invoker = on` makes the view run under the caller's rights, so the underlying table's RLS policies still apply to it. Then the client reads `public_profiles` and the private columns are not reachable from the browser at all, whatever the query says.
+What changes for the app:
 
-Column-level grants (`grant select (id, display_name) on profiles to anon`) do the same job without a view; the view is easier to read six months later.
+- `select('*')` on `profiles` from the browser now fails with permission denied instead of returning every column. Read `public_profiles`, or name the columns.
+- Row policies keep working, including ones that test a private column: RLS filters rows through the view the same way it does on the table.
+- Writes keep their grants, since only `select` was revoked. A write that asks for the row back, `update(...).select()`, must name public columns too.
+- A user's own private fields (their email, their plan) are no longer readable through the browser client, and not through a session-scoped server client either, since it runs as the same role. Read them on the server with the service-role client, filtered by the verified user's id (Fix B in `fixes/supabase-rls.md` Step 4), or take the email from `supabase.auth.getUser()`.
+
+Do not pair `security_invoker = on` with revoking all table access from `anon` and `authenticated`. The view runs as the caller, the caller can no longer read the table, and every read through the view fails with permission denied.
+
+For a table that is mostly private, moving the private columns into their own table with owner-only policies is the simpler shape to live with.
 
 ## Step 5: Fix the server-to-client boundary
 
@@ -150,5 +160,5 @@ The same rule covers `getServerSideProps` return values, SvelteKit `load` return
 - Open the app with DevTools > Network, load the list, feed, and profile pages, and read the field names in the largest JSON responses. Anything in there that the page does not render is over-exposure.
 - Curl the list endpoint directly and count the keys per object; the count should match the field list in the serializer, not the column count of the table.
 - View source on a server-rendered page and search the HTML for a known-sensitive column name (`email`, `stripe_customer_id`). The RSC payload and `__NEXT_DATA__` are in that source.
-- Supabase: from the browser (or with the anon key), `select('*')` the table and see how many columns come back. If the answer is all of them, the view or the grants are not in place.
+- Supabase: from the browser (or with the anon key), `select('*')` the table. It should fail with permission denied, and `select('*')` on the view should return only the public columns. If the table hands back every column, the grants are not in place.
 - Add a column to a user table, change nothing else, and re-run the first check. A correct projection does not start returning it.
