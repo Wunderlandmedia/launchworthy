@@ -2,7 +2,7 @@
 
 Rate limiting is not about scale, it is about abuse and cost. The two endpoints that must have it in v1:
 - Anything that calls a **paid API** (OpenAI, Anthropic, Stripe, SMS, email). One script overnight is a real bill.
-- **Auth endpoints** (login, register, password reset). Without a limit they invite credential stuffing and spam.
+- **Auth endpoints** (login, register, password reset). Without a limit they invite credential stuffing and spam. If auth is hosted (Supabase Auth, Firebase Auth, Clerk, Auth0), those endpoints are the provider's, not yours: tune the provider's rate limits and bot-protection settings instead of wrapping them.
 
 ## Default: Upstash Ratelimit
 
@@ -32,7 +32,10 @@ import { ratelimit } from "@/lib/ratelimit"
 
 export async function POST(req: Request) {
   const user = await getCurrentUser(req)
-  const key = user?.id ?? req.headers.get("x-forwarded-for") ?? "anonymous"
+  // The client IP from the header your host sets, which the client cannot forge.
+  // Vercel: x-real-ip. Cloudflare: cf-connecting-ip. Netlify Functions: context.ip.
+  // Read only your host's: a header your host does not set is one the client can send.
+  const key = user?.id ?? req.headers.get("x-real-ip") ?? "anonymous"
 
   const { success, limit, remaining, reset } = await ratelimit.limit(key)
   if (!success) {
@@ -55,7 +58,7 @@ Tune the window per endpoint: an AI generation route might allow 5 per minute; a
 
 - **Cloudflare:** Rate Limiting Rules in the dashboard, or the Workers rate limiting binding. No extra service.
 - **Vercel:** the Firewall / rate limiting on Pro, or Upstash as above on any plan.
-- **Express/Node server:** `express-rate-limit` with a Redis store (in-memory only works for a single instance).
+- **Express/Node server:** `express-rate-limit` with a Redis store. Its default store counts in memory, per process: on serverless or with more than one instance, each one keeps its own count and a new one starts at zero, which is the same as no limit. The snippet below is only right for a single long-lived process.
 
 ```ts
 import rateLimit from "express-rate-limit"
@@ -68,5 +71,7 @@ app.use("/api/auth", rateLimit({ windowMs: 10 * 60 * 1000, max: 5 }))
 ## Verify
 
 - Confirm the limiter runs before the expensive work, not after.
+- Confirm the count lives in a shared store (Redis, the platform's limiter), unless the app runs as exactly one long-lived process.
+- Confirm the IP key comes from your host's own client-IP header, not a raw `x-forwarded-for` behind a proxy that appends to it.
 - Hit the endpoint in a loop past the limit and confirm you get a 429 with a `Retry-After` header.
 - Confirm the Upstash credentials are server-side only: grep for them behind `VITE_`/`NEXT_PUBLIC_` (they must not be).
