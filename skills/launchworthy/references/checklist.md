@@ -170,7 +170,7 @@ An app with auth, forms, or analytics collects personal data and needs a privacy
 
 - [ ] A privacy policy exists and is reachable. Grep for a privacy route, page, or link (`privacy`, `privacy-policy`, `PrivacyPolicy`, an href containing `privacy`). App collects PII with no privacy page anywhere = `[MEDIUM]`. Every app store, ad platform, and OAuth consent screen requires the link, so its absence also blocks distribution.
 - [ ] The policy is not an unedited template. Grep the policy text for placeholder tokens: `[Company Name]`, `[Your Company]`, `[email]`, `[DATE]`, `[Website URL]`, `Last updated: [`, `example.com`, `lorem ipsum`, or a company name that is not this app's. A privacy policy still carrying template placeholders is void on its face and tells the reader nobody checked it = `[MEDIUM]`.
-- [ ] The policy matches the data the code actually collects and shares. This is the honesty check and the one worth doing from code. Reconcile the third parties the policy discloses against the integrations the code ships: analytics (GA, Plausible, PostHog, Mixpanel, Segment), payments (Stripe), error tracking (Sentry), email (Resend, SendGrid, Postmark), auth and database (Supabase, Firebase, Clerk, Auth0), ad or tracking pixels. A policy that discloses none of them while the code loads several, or that states "we do not share your data with third parties" while an analytics SDK and a tracking pixel sit in the bundle, is affirmatively false = `[MEDIUM]`. Whether the wording is otherwise adequate is MANUAL CHECK NEEDED, a human or lawyer's call; this check fires only on the contradiction the code proves. See `fixes/account-deletion.md`.
+- [ ] The policy matches the data the code actually collects and shares. This is the honesty check and the one worth doing from code. Reconcile the third parties the policy discloses against the integrations the code ships: analytics (GA, Plausible, PostHog, Mixpanel, Segment), payments (Stripe), error tracking (Sentry), email (Resend, SendGrid, Postmark), auth and database (Supabase, Firebase, Clerk, Auth0), ad or tracking pixels, AI model providers (`openai`, `@anthropic-ai/sdk`, `ai` / `@ai-sdk/*`, `@google/genai`, `replicate`, `elevenlabs` / `@elevenlabs/elevenlabs-js`), and LLM observability (`langfuse`, `langsmith`, a `helicone.ai` base URL). In an AI app, the user content sent to the model provider is the most sensitive sharing the app does; a policy that never names a provider misses the biggest one. A policy that discloses none of them while the code loads several, or that states "we do not share your data with third parties" while an analytics SDK and a tracking pixel sit in the bundle, is affirmatively false = `[MEDIUM]`. Whether the wording is otherwise adequate is MANUAL CHECK NEEDED, a human or lawyer's call; this check fires only on the contradiction the code proves. See `fixes/account-deletion.md`.
 
 ---
 
@@ -220,7 +220,10 @@ RLS enabled on every table is not the whole answer. A server route that queries 
 - [ ] Auth cookies: `httpOnly` true (missing = `[HIGH]`), `secure` true in production (missing = `[HIGH]`), `sameSite` lax/strict (missing = `[MEDIUM]`).
 
 **Dependencies and git hygiene:**
-- [ ] Run `npm audit` (or `pnpm audit`/`pip-audit`). Critical vulns = `[HIGH]`, high vulns = `[MEDIUM]`.
+- [ ] Audit the production dependencies with the project's own lockfile and package manager: `npm audit --omit=dev`, `pnpm audit --prod`, `yarn npm audit --environment production` (Yarn 2+), `bun audit --prod`, `pip-audit`. Critical vulns = `[HIGH]`, high vulns = `[MEDIUM]`.
+- [ ] A known-exploited vulnerability (in CISA's KEV catalog) or a pre-auth remote code execution in a runtime dependency of a live or launching app = `[CRITICAL]`, whatever label the audit tool gives it. Example: CVE-2025-55182 ("React2Shell"), an unauthenticated RCE in React Server Components, CVSS 10.0, which reaches Next.js, React Router, and other frameworks that support Server Components even when the app defines no Server Functions.
+- [ ] The audit did not run (no lockfile, a registry error, a package manager with no audit command) = report `not audited`, never PASS. npm refuses to audit without a lockfile by default.
+- [ ] Runtime dependencies on `latest` or `*` = `[MEDIUM]`: every install can pull a different, unaudited version.
 - [ ] `.env*` missing from `.gitignore` = `[CRITICAL]`. `.env` ever committed = `[HIGH]`, and the secrets must be rotated, not just deleted.
 - [ ] Hardcoded `http://` URLs in production config = `[MEDIUM]`.
 
@@ -248,8 +251,10 @@ RLS enabled on every table is not the whole answer. A server route that queries 
 
 **Rate limiting (canonical home):**
 - [ ] No rate limit on endpoints calling paid APIs (OpenAI, Anthropic, Stripe, SMS, email) = `[HIGH]`; one abusive user runs up a real bill.
-- [ ] No rate limit on auth endpoints (login, register, password reset) = `[HIGH]`; credential stuffing and spam.
+- [ ] No rate limit on auth endpoints (login, register, password reset) = `[HIGH]`; credential stuffing and spam. With hosted auth (Supabase Auth, Firebase Auth, Clerk, Auth0) those endpoints belong to the provider, not the app: do not flag the app for them, check the provider's rate-limit and bot-protection settings instead (Supabase Auth limits sign-in and sign-up per IP by default, configurable per project). Flag only auth routes the app serves itself.
 - [ ] No rate limiting anywhere = `[HIGH]`. See `fixes/rate-limiting.md`.
+- [ ] A limiter that counts in memory (`express-rate-limit` with its default store, a module-scope `Map`, an LRU cache) on serverless, or on any host running more than one instance, counts per instance, and every new instance starts at zero. Score it as no rate limit.
+- [ ] The limiter keys on a client IP the client can forge. A raw `x-forwarded-for` is client-controlled wherever a proxy appends to it (Cloudflare does), so a script sends a fresh value per request and never reaches the limit. Key on the header the host sets: Vercel `x-real-ip` (Vercel also overwrites `x-forwarded-for`), Cloudflare `cf-connecting-ip`, Netlify Functions `context.ip`. A forgeable key on a paid or auth endpoint scores as no limit there.
 
 ---
 
