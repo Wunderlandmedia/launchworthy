@@ -30,7 +30,7 @@ The app works and looks finished. It is also one changed URL away from leaking e
 3. **[HIGH] No rate limit on `src/api/generate-summary.ts`** which calls the OpenAI API. One script can run this in a loop overnight and hand you a four-figure bill. Add Upstash Ratelimit per the `rate-limiting.md` playbook, keyed by user id, 5 per minute.
 4. **[HIGH] No input validation on the task-create call.** `src/api/tasks.ts:22` writes `req.body` straight to Supabase. Add a Zod schema (`input-validation.md`).
 5. **[HIGH] No error tracking anywhere.** No Sentry, no global handler. When something breaks in production you will not know. Install Sentry client + server and add an error boundary (`error-tracking.md`).
-6. **[HIGH] No automated backups configured.** Confirm Supabase daily backups are on for your plan and note the retention. Free tier has limited backups; consider a scheduled `pg_dump` if you are on it.
+6. **[HIGH] No automated backups.** Supabase Free has no automatic backups, and nothing in the repo schedules a `pg_dump`. On Free, upgrade to Pro (7 days of daily backups) or schedule a dump to storage you control; on a paid plan, paste the newest backup date from Database > Backups.
 7. **[HIGH] No error boundary.** `src/App.tsx` has no `Sentry.ErrorBoundary` or equivalent, so one render error white-screens the whole app. Wrap the app.
 8. **[HIGH] One environment only.** Production and development share the same Supabase project. A bad migration in dev can corrupt live data. Create a separate project or use branching.
 
@@ -48,7 +48,7 @@ The app works and looks finished. It is also one changed URL away from leaking e
 
 ## Manual Checks Required
 
-- **Secret-in-bundle test.** Run `npm run build`, open the app, DevTools > Sources, search for `service_role`. Given finding 2, expect a hit. After the fix, re-run and confirm it is gone. Evidence: screenshot.
+- **Secret-in-bundle test.** Run the deployed-bundle probe against the production URL. Given finding 2, expect `jwt role=service_role`. After rotating the key and moving it server-side, re-run and confirm only `role=anon` remains. Evidence: the probe's output.
 - **User A cannot read User B.** After enabling RLS, log in as two accounts, try to fetch B's task by id as A. Evidence: paste the empty result.
 - **Alerting reaches you.** After installing Sentry, throw a test error and confirm the alert arrives in email/Slack. Evidence: screenshot.
 - **Rebuild in an hour.** Code is in git. Are the env vars saved in a password manager, and can you restore the database from a backup? Note which is missing.

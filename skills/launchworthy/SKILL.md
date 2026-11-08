@@ -111,7 +111,7 @@ If the project is under both gates, do not ask at all. A prompt the user has to 
 ### Step 3: Score Each Domain
 
 - **PASS:** all checks pass, or only `[LOW]` findings remain.
-- **WARN:** 1-2 `[MEDIUM]`/`[HIGH]` findings, nothing that causes data loss, a breach, or extended downtime.
+- **WARN:** any `[MEDIUM]` or `[HIGH]` findings that do not meet the FAIL rule.
 - **FAIL:** any `[CRITICAL]`, or 3+ `[HIGH]` in the domain. Must be fixed before real users touch this.
 
 ---
